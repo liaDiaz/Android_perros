@@ -1,13 +1,18 @@
 package edu.tec.perros
 
+import android.annotation.SuppressLint
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.inputmethod.InputMethodManager
 import android.widget.Adapter
 import android.widget.Toast
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import edu.tec.perros.adapter.PerrosAdapter
 import edu.tec.perros.databinding.ActivityMainBinding
+import edu.tec.perros.mvvm.ListaPerrosViewModel
+import edu.tec.perros.pattern.RetrofitSingleton
 import edu.tec.perros.response.PerroResponse
 import edu.tec.perros.service.PerrosAPIService
 import kotlinx.coroutines.CoroutineScope
@@ -20,11 +25,28 @@ class MainActivity : AppCompatActivity(), android.widget.SearchView.OnQueryTextL
     private lateinit var adapter: PerrosAdapter
     private lateinit var binding: ActivityMainBinding
     private  val perrosPics = mutableListOf<String>()
+    private lateinit var viewModel: ListaPerrosViewModel
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         initAdapter()
+        initViewModel()
+    }
+
+    @SuppressLint("NotifyDataSetChanged")
+    private fun initViewModel(){
+        //crea un provider que es la clase que resulvel para crear el viewModel
+        viewModel = ViewModelProvider(this).get(ListaPerrosViewModel::class.java)
+        viewModel.getLiveDataObserver().observe(this,{
+            if(!it.isEmpty()){
+                //para poder actulizar imagenes
+                adapter.setImagenes(it)
+                adapter.notifyDataSetChanged()
+            }
+        })
     }
 
     //esto es para darle al adapter el layorut y el adaptador
@@ -41,24 +63,18 @@ class MainActivity : AppCompatActivity(), android.widget.SearchView.OnQueryTextL
 
     }
 
-    private fun getRetrofit():Retrofit{
-        //esto es para la conecoioon con ek servicio simpre se debe temrianr con diagonal
-        //El converter es para convertir el json al local
-        return Retrofit.Builder().baseUrl("https://dog.ceo/api/breed/").addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
 
     private fun hideKeyboard() {
         val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
         imm.hideSoftInputFromWindow(binding.root.windowToken, 0)
     }
 
-    private fun buscarPerrosPorRaza(raza: String){
+   /* private fun buscarPerrosPorRaza(raza: String){
         //crear un courtine scope para reallizar o definir un bloqueo para poder esperar a que otro termine
 
         // el dispach IO se utiliza para y el defult
         CoroutineScope(Dispatchers.IO).launch {
-            val llamado = getRetrofit().create(PerrosAPIService::class.java).getPerrosPorRaza("$raza/images")
+            val llamado = RetrofitSingleton.getRetrofit().create(PerrosAPIService::class.java).getPerrosPorRaza("$raza/images")
             //cachar la respuesta o el body del response y aqui debe todas las cadenas o lo que le pedimos
             val perrosResponse: PerroResponse? = llamado.body()
             // es es para que la corrutina pueda modificar la interfaz grafica sin afectar el hilo principal de la interfaz frafica
@@ -82,17 +98,27 @@ class MainActivity : AppCompatActivity(), android.widget.SearchView.OnQueryTextL
         }
 
     }
+    */
+
     // este es mejor porque este es cuando ya da el aceptar a la busqueda
 
     override fun onQueryTextSubmit(searchString: String?): Boolean {
         if(!searchString.isNullOrEmpty()){
-            buscarPerrosPorRaza(searchString.lowercase())
+           // buscarPerrosPorRaza(searchString.lowercase())
+            consultaPerros(searchString)
         }
        return true
     }
 
     // no es muy recomdable por que es con cada tecleo de letra
 
+    fun consultaPerros(searchString: String?){
+        if(!searchString.isNullOrEmpty()){
+            viewModel.perroAPICall(searchString)
+            hideKeyboard()
+        }
+
+    }
     override fun onQueryTextChange(p0: String?): Boolean {
         return true
     }
